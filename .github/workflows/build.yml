@@ -14,6 +14,7 @@ jobs:
         run: |
           mkdir -p skyos/assets
           cp logo.png skyos/assets/logo.png 2>/dev/null || true
+          chmod +x make_skyos.py
           sudo python3 make_skyos.py
 
       - name: ISO als Download bereitstellen
