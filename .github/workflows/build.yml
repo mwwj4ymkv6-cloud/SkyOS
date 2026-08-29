@@ -1,0 +1,23 @@
+name: Build SkyOS ISO
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v3
+
+      - name: Logo vorbereiten und ISO bauen
+        run: |
+          mkdir -p skyos/assets
+          cp logo.png skyos/assets/logo.png 2>/dev/null || true
+          sudo python3 make_skyos.py
+
+      - name: ISO als Download bereitstellen
+        uses: actions/upload-artifact@v3
+        with:
+          name: SkyOS-1.0-ISO
+          path: skyos/output/SkyOS-1.0-amd64.iso
