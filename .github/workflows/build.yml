@@ -24,44 +24,31 @@ jobs:
 
       - name: Live-System aufbauen & ISO generieren
         run: |
-          # 1. Ausgabeverzeichnis & Arbeitsbereich vorbereiten
           mkdir -p skyos/output
           sudo mkdir -p build_env/chroot build_env/iso/live build_env/iso/boot/grub
-
-          # 2. Minimales Debian-Grundsystem erstellen
           sudo debootstrap --arch=amd64 --variant=minbase bookworm build_env/chroot http://deb.debian.org/debian/
-
-          # 3. SkyOS-Dateien in das chroot-System kopieren
-          sudo mkdir -p build_env/chroot/usr/share/skyos/media-center \
-                        build_env/chroot/usr/share/skyos/assets \
-                        build_env/chroot/usr/local/bin
-
+          
+          sudo mkdir -p build_env/chroot/usr/share/skyos/media-center build_env/chroot/usr/share/skyos/assets build_env/chroot/usr/local/bin
           sudo cp skyos/media-center/main.py build_env/chroot/usr/share/skyos/media-center/ 2>/dev/null || true
           sudo cp skyos/assets/logo.png build_env/chroot/usr/share/skyos/assets/ 2>/dev/null || true
+          
           if [ -f skyos/scripts/skyos-session.sh ]; then
             sudo cp skyos/scripts/skyos-session.sh build_env/chroot/usr/local/bin/skyos-session
             sudo chmod +x build_env/chroot/usr/local/bin/skyos-session
           fi
 
-          # 4. Kernel und Initrd sichern (falls vorhanden)
           sudo cp build_env/chroot/boot/vmlinuz-* build_env/iso/live/vmlinuz 2>/dev/null || sudo touch build_env/iso/live/vmlinuz
           sudo cp build_env/chroot/boot/initrd.img-* build_env/iso/live/initrd.img 2>/dev/null || sudo touch build_env/iso/live/initrd.img
 
-          # 5. Komprimiertes Dateisystem (SquashFS) erstellen
           sudo mksquashfs build_env/chroot build_env/iso/live/filesystem.squashfs -e boot
 
-          # 6. GRUB-Bootloader-Konfiguration schreiben
-          cat << 'EOF' | sudo tee build_env/iso/boot/grub/grub.cfg
-set default=0
-set timeout=3
+          echo 'set default=0' | sudo tee build_env/iso/boot/grub/grub.cfg
+          echo 'set timeout=3' | sudo tee -a build_env/iso/boot/grub/grub.cfg
+          echo 'menuentry "SkyOS 1.0 Live" {' | sudo tee -a build_env/iso/boot/grub/grub.cfg
+          echo '    linux /live/vmlinuz boot=live quiet splash' | sudo tee -a build_env/iso/boot/grub/grub.cfg
+          echo '    initrd /live/initrd.img' | sudo tee -a build_env/iso/boot/grub/grub.cfg
+          echo '}' | sudo tee -a build_env/iso/boot/grub/grub.cfg
 
-menuentry "SkyOS 1.0 Live" {
-    linux /live/vmlinuz boot=live quiet splash
-    initrd /live/initrd.img
-}
-EOF
-
-          # 7. ISO mit GRUB erstellen
           sudo grub-mkrescue -o skyos/output/SkyOS-1.0-amd64.iso build_env/iso
 
       - name: ISO als Download bereitstellen
