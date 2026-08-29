@@ -30,7 +30,7 @@ jobs:
           # 1. Minimales Debian-Grundsystem erstellen
           sudo debootstrap --arch=amd64 --variant=minbase bookworm build_env/chroot http://deb.debian.org/debian/
           
-          # Non-free und Contrib Quellen hinzufügen (für beste Treiber-Unterstützung)
+          # Non-free und Contrib Quellen hinzufügen
           echo "deb http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware" | sudo tee build_env/chroot/etc/apt/sources.list
           
           # 2. Treiber, Hardware-Beschleunigung, Codecs & Video-Engine im Hintergrund installieren
@@ -70,43 +70,20 @@ jobs:
           sudo cp skyos/media-center/main.py build_env/chroot/usr/share/skyos/media-center/ 2>/dev/null || true
           sudo cp skyos/assets/logo.png build_env/chroot/usr/share/skyos/assets/ 2>/dev/null || true
 
-          # 4. MPV-Konfiguration für flüssige 1080p/4K Hardware-Wiedergabe erstellen
+          # 4. MPV-Konfiguration für flüssige Hardware-Wiedergabe
           sudo mkdir -p build_env/chroot/etc/mpv
-          cat << 'EOF' | sudo tee build_env/chroot/etc/mpv/mpv.conf
-hwdec=auto-safe
-vo=gpu
-profile=fast
-keep-open=no
-border=no
-ontop=yes
-EOF
+          printf "hwdec=auto-safe\nvo=gpu\nprofile=fast\nkeep-open=no\nborder=no\nontop=yes\n" | sudo tee build_env/chroot/etc/mpv/mpv.conf
 
           # 5. Autostart-Skript erstellen (Kiosk-Modus)
-          cat << 'EOF' | sudo tee build_env/chroot/usr/local/bin/start-skyos.sh
-#!/bin/sh
-export DISPLAY=:0
-export SKYOS_ROOT="/usr/share/skyos"
-xset s off
-xset -dpms
-xset s noblank
-exec python3 /usr/share/skyos/media-center/main.py
-EOF
+          printf "#!/bin/sh\nexport DISPLAY=:0\nexport SKYOS_ROOT=\"/usr/share/skyos\"\nxset s off\nxset -dpms\nxset s noblank\nexec python3 /usr/share/skyos/media-center/main.py\n" | sudo tee build_env/chroot/usr/local/bin/start-skyos.sh
           sudo chmod +x build_env/chroot/usr/local/bin/start-skyos.sh
 
           # 6. Systemd Autologin einrichten
           sudo mkdir -p build_env/chroot/etc/systemd/system/getty@tty1.service.d/
-          cat << 'EOF' | sudo tee build_env/chroot/etc/systemd/system/getty@tty1.service.d/override.conf
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
-EOF
+          printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" | sudo tee build_env/chroot/etc/systemd/system/getty@tty1.service.d/override.conf
 
           # Startskript beim Booten automatisch ausführen
-          cat << 'EOF' | sudo tee -a build_env/chroot/root/.bashrc
-if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    startx /usr/local/bin/start-skyos.sh -- -nocursor
-fi
-EOF
+          printf "\nif [ -z \"\$DISPLAY\" ] && [ \"\$(tty)\" = \"/dev/tty1\" ]; then\n    startx /usr/local/bin/start-skyos.sh -- -nocursor\nfi\n" | sudo tee -a build_env/chroot/root/.bashrc
 
           # 7. Kernel und Initrd sichern
           sudo cp build_env/chroot/boot/vmlinuz-* build_env/iso/live/vmlinuz 2>/dev/null || true
@@ -115,16 +92,8 @@ EOF
           # 8. SquashFS Dateisystem erstellen
           sudo mksquashfs build_env/chroot build_env/iso/live/filesystem.squashfs -e boot
 
-          # 9. GRUB Bootloader Konfiguration
-          cat << 'EOF' | sudo tee build_env/iso/boot/grub/grub.cfg
-set default=0
-set timeout=2
-
-menuentry "SkyOS 1.0" {
-    linux /live/vmlinuz boot=live quiet splash
-    initrd /live/initrd.img
-}
-EOF
+          # 9. GRUB Bootloader Konfiguration (mit printf statt heredoc, um YAML-Fehler zu verhindern)
+          printf "set default=0\nset timeout=2\n\nmenuentry \"SkyOS 1.0\" {\n    linux /live/vmlinuz boot=live quiet splash\n    initrd /live/initrd.img\n}\n" | sudo tee build_env/iso/boot/grub/grub.cfg
 
           # 10. ISO-Datei generieren
           sudo grub-mkrescue -o skyos/output/SkyOS-1.0-amd64.iso build_env/iso
