@@ -28,13 +28,16 @@ jobs:
           sudo mkdir -p build_env/chroot build_env/iso/live build_env/iso/boot/grub
           
           # 1. Minimales Debian-Grundsystem erstellen
-          sudo debootstrap --arch=amd64 --variant=minbase bookworm build_env/chroot http://deb.debian.org/debian/
+          sudo debootstrap --arch=amd64 --variant=minbase bookworm build_env/chroot http://ftp.de.debian.org/debian/
           
-          # Non-Free und Non-Free-Firmware für Debian 12 (Bookworm) korrekt eintragen
-          printf "deb http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware\n" | sudo tee build_env/chroot/etc/apt/sources.list
+          # DNS-Auflösung für das Chroot-System bereitstellen
+          sudo cp /etc/resolv.conf build_env/chroot/etc/resolv.conf
+
+          # Paketquellen konfigurieren
+          printf "deb http://ftp.de.debian.org/debian/ bookworm main contrib non-free non-free-firmware\n" | sudo tee build_env/chroot/etc/apt/sources.list
           
           # 2. Treiber, Hardware-Beschleunigung, Codecs & Video-Engine im Hintergrund installieren
-          sudo chroot build_env/chroot apt-get update
+          sudo chroot build_env/chroot apt-get update -y
           sudo chroot build_env/chroot apt-get install -y --no-install-recommends \
             linux-image-amd64 \
             live-boot \
